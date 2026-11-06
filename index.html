@@ -1,0 +1,2271 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>👻 GHOST RADAR — Certainty Factor (Dataset & 4x4)</title>
+  <style>
+    :root {
+      --bg-dark: #070b12;
+      --panel-bg: rgba(13, 21, 34, 0.88);
+      --panel-border: rgba(0, 255, 170, 0.25);
+      --panel-glow: rgba(0, 255, 170, 0.15);
+      --neon-cyan: #00f3ff;
+      --neon-green: #00ffaa;
+      --neon-red: #ff2a5f;
+      --neon-gold: #ffb800;
+      --neon-purple: #bd00ff;
+      --text-main: #e2f1ff;
+      --text-muted: #7b93a8;
+      --grid-bg: #09101a;
+      --cell-border: rgba(30, 50, 75, 0.6);
+      --font-mono: 'Consolas', 'Fira Code', 'Courier New', monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 20%, rgba(0, 243, 255, 0.08) 0%, transparent 60%),
+        radial-gradient(circle at 80% 80%, rgba(189, 0, 255, 0.05) 0%, transparent 50%),
+        linear-gradient(rgba(0, 255, 170, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 170, 0.03) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* CRT Scanline Overlay */
+    body::before {
+      content: " ";
+      display: block;
+      position: fixed;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+      background-size: 100% 4px;
+      z-index: 999;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+
+    /* Ambient particles container */
+    #particles-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 1240px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Header */
+    header {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 0 25px var(--panel-glow);
+      backdrop-filter: blur(10px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-icon {
+      font-size: 34px;
+      animation: floatGhost 3s ease-in-out infinite alternate;
+      filter: drop-shadow(0 0 10px var(--neon-cyan));
+    }
+
+    @keyframes floatGhost {
+      0% { transform: translateY(0) rotate(-4deg); }
+      100% { transform: translateY(-6px) rotate(4deg); }
+    }
+
+    .brand-text h1 {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      background: linear-gradient(90deg, #fff, var(--neon-cyan), var(--neon-green));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-transform: uppercase;
+    }
+
+    .brand-text p {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      letter-spacing: 1px;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sound-toggle, .btn-guide {
+      background: rgba(0, 243, 255, 0.1);
+      border: 1px solid rgba(0, 243, 255, 0.3);
+      color: var(--neon-cyan);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .sound-toggle:hover, .btn-guide:hover {
+      background: rgba(0, 243, 255, 0.25);
+      box-shadow: 0 0 12px rgba(0, 243, 255, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .sound-toggle.muted {
+      color: var(--text-muted);
+      border-color: rgba(123, 147, 168, 0.3);
+      background: rgba(123, 147, 168, 0.1);
+    }
+
+    /* Main Grid Layout */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 330px 1fr 350px;
+      gap: 16px;
+    }
+
+    @media (max-width: 1150px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Panels */
+    .panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(8px);
+      position: relative;
+    }
+
+    .panel-title {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      letter-spacing: 1.5px;
+      color: var(--neon-green);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(0, 255, 170, 0.15);
+      padding-bottom: 8px;
+    }
+
+    .panel-title::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      background: var(--neon-green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--neon-green);
+    }
+
+    /* HUD Stats (Lives, Battery, EMF) */
+    .hud-box {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .lives-container {
+      display: flex;
+      gap: 6px;
+    }
+
+    .heart-icon {
+      font-size: 18px;
+      filter: drop-shadow(0 0 6px rgba(255, 42, 95, 0.7));
+      transition: all 0.3s;
+    }
+
+    .heart-icon.lost {
+      filter: grayscale(1) opacity(0.25);
+    }
+
+    /* Battery Bar */
+    .battery-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 140px;
+    }
+
+    .battery-bar {
+      flex: 1;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      position: relative;
+    }
+
+    .battery-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, var(--neon-green), var(--neon-cyan));
+      border-radius: 2px;
+      box-shadow: 0 0 8px var(--neon-green);
+      transition: width 0.4s ease, background 0.4s ease;
+    }
+
+    .battery-fill.low {
+      background: linear-gradient(90deg, var(--neon-red), var(--neon-gold));
+      box-shadow: 0 0 8px var(--neon-red);
+      animation: pulseAlert 1s infinite alternate;
+    }
+
+    @keyframes pulseAlert {
+      0% { opacity: 0.6; }
+      100% { opacity: 1; }
+    }
+
+    .battery-val {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--neon-cyan);
+      min-width: 40px;
+      text-align: right;
+    }
+
+    /* EMF Meter */
+    .emf-meter {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 8px;
+      border: 1px solid rgba(0, 243, 255, 0.15);
+    }
+
+    .emf-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--neon-cyan);
+    }
+
+    .emf-leds {
+      display: flex;
+      gap: 6px;
+      height: 14px;
+    }
+
+    .emf-led {
+      flex: 1;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      transition: all 0.15s ease;
+    }
+
+    .emf-led.active-1 { background: #00ff66; box-shadow: 0 0 8px #00ff66; }
+    .emf-led.active-2 { background: #73ff00; box-shadow: 0 0 8px #73ff00; }
+    .emf-led.active-3 { background: #ffcc00; box-shadow: 0 0 8px #ffcc00; }
+    .emf-led.active-4 { background: #ff6600; box-shadow: 0 0 8px #ff6600; }
+    .emf-led.active-5 { background: #ff0033; box-shadow: 0 0 12px #ff0033; animation: emfStrobe 0.2s infinite alternate; }
+
+    @keyframes emfStrobe {
+      from { opacity: 0.7; }
+      to { opacity: 1; }
+    }
+
+    /* Mode Selection Tabs (Scan vs Catch) */
+    .action-mode-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.35);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .mode-btn {
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+
+    .mode-btn .mode-sub {
+      font-size: 9px;
+      opacity: 0.7;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .mode-btn.active.scan {
+      background: rgba(0, 243, 255, 0.15);
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+      box-shadow: 0 0 12px rgba(0, 243, 255, 0.3);
+    }
+
+    .mode-btn.active.tangkap {
+      background: rgba(255, 42, 95, 0.2);
+      border-color: var(--neon-red);
+      color: var(--neon-red);
+      box-shadow: 0 0 15px rgba(255, 42, 95, 0.4);
+      animation: pulseCatch 1.5s infinite;
+    }
+
+    @keyframes pulseCatch {
+      0% { box-shadow: 0 0 8px rgba(255, 42, 95, 0.3); }
+      50% { box-shadow: 0 0 18px rgba(255, 42, 95, 0.6); }
+      100% { box-shadow: 0 0 8px rgba(255, 42, 95, 0.3); }
+    }
+
+    /* Restart Button */
+    .btn-restart {
+      background: linear-gradient(135deg, rgba(0, 255, 170, 0.2), rgba(0, 243, 255, 0.2));
+      border: 1px solid var(--neon-green);
+      color: var(--neon-green);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-restart:hover {
+      background: linear-gradient(135deg, rgba(0, 255, 170, 0.4), rgba(0, 243, 255, 0.4));
+      box-shadow: 0 0 14px rgba(0, 255, 170, 0.5);
+      transform: translateY(-1px);
+    }
+
+    /* Center Stage: Radar & Grid Screen */
+    .radar-screen-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #0b1524 0%, #05080f 85%);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 20px 16px;
+      box-shadow: 0 0 40px rgba(0, 243, 255, 0.1), inset 0 0 60px rgba(0, 0, 0, 0.8);
+      overflow: hidden;
+      min-height: 540px;
+    }
+
+    /* Radar Sweep Canvas Overlay */
+    #radar-canvas {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0.65;
+    }
+
+    .board-header-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      z-index: 3;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(0, 243, 255, 0.3);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--neon-cyan);
+    }
+
+    /* Outer Row & Column Label Layout */
+    .grid-container {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 14px;
+      background: rgba(5, 10, 18, 0.85);
+      border-radius: 14px;
+      border: 1px solid rgba(0, 255, 170, 0.3);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 35px rgba(0, 0, 0, 0.7);
+      max-width: 100%;
+      overflow-x: auto;
+    }
+
+    .tactical-grid-wrapper {
+      display: grid;
+      grid-template-columns: 88px repeat(4, 82px);
+      grid-template-rows: 38px repeat(4, 82px);
+      gap: 6px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Corner Header (Baris \ Kolom) */
+    .grid-corner-label {
+      grid-column: 1;
+      grid-row: 1;
+      width: 88px;
+      height: 38px;
+      background: rgba(0, 0, 0, 0.65);
+      border: 1.5px solid rgba(0, 243, 255, 0.4);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 1.15;
+      text-align: center;
+      font-weight: 800;
+      box-shadow: inset 0 0 8px rgba(0, 243, 255, 0.2);
+    }
+
+    /* Top Column Headers */
+    .grid-col-headers {
+      grid-column: 2 / span 4;
+      grid-row: 1;
+      display: grid;
+      grid-template-columns: repeat(4, 82px);
+      gap: 6px;
+    }
+
+    .col-header-item {
+      width: 82px;
+      height: 38px;
+      background: rgba(0, 243, 255, 0.15);
+      border: 2px solid #00f3ff;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: 0.8px;
+      text-shadow: 0 0 10px rgba(0, 243, 255, 0.9);
+      box-shadow: 0 0 10px rgba(0, 243, 255, 0.25), inset 0 0 8px rgba(0, 243, 255, 0.2);
+    }
+
+    /* Left Row Headers */
+    .grid-row-headers {
+      grid-column: 1;
+      grid-row: 2 / span 4;
+      display: grid;
+      grid-template-rows: repeat(4, 82px);
+      gap: 6px;
+    }
+
+    .row-header-item {
+      width: 88px;
+      height: 82px;
+      background: rgba(0, 255, 170, 0.15);
+      border: 2px solid #00ffaa;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: 0.8px;
+      text-shadow: 0 0 10px rgba(0, 255, 170, 0.9);
+      box-shadow: 0 0 10px rgba(0, 255, 170, 0.25), inset 0 0 8px rgba(0, 255, 170, 0.2);
+    }
+
+    /* Grid Board 4x4 */
+    .grid-board {
+      grid-column: 2 / span 4;
+      grid-row: 2 / span 4;
+      display: grid;
+      grid-template-columns: repeat(4, 82px);
+      grid-template-rows: repeat(4, 82px);
+      gap: 6px;
+      position: relative;
+    }
+
+    .grid-cell {
+      position: relative;
+      width: 82px;
+      height: 82px;
+      border-radius: 8px;
+      border: 1.5px solid var(--cell-border);
+      background: rgba(10, 18, 28, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.2, 0.9, 0.3, 1);
+      overflow: hidden;
+    }
+
+    .grid-cell:hover {
+      transform: scale(1.05);
+      z-index: 10;
+      box-shadow: 0 0 16px var(--neon-cyan);
+      border-color: var(--neon-cyan);
+    }
+
+    .grid-cell .cell-coord {
+      position: absolute;
+      top: 3px;
+      left: 5px;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.5);
+      font-weight: 500;
+    }
+
+    .grid-cell .cell-value {
+      font-size: 16px;
+      color: #fff;
+      z-index: 1;
+      letter-spacing: 0.5px;
+      font-weight: 800;
+    }
+
+    .grid-cell .cell-pct {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-top: 2px;
+      z-index: 1;
+    }
+
+    /* Grid Cell Status Markers */
+    .grid-cell.scanned-whisper {
+      border: 2.5px solid var(--neon-cyan) !important;
+      box-shadow: 0 0 14px rgba(0, 243, 255, 0.6);
+    }
+
+    .grid-cell.scanned-cold {
+      border: 2px dashed #64748b !important;
+    }
+
+    .grid-cell.wrong-caught {
+      border: 2.5px solid var(--neon-red) !important;
+    }
+
+    /* LOCKED / CHOSEN CELL: Unclickable, Dimmed, 0.00 */
+    .grid-cell.cell-locked {
+      background: rgba(10, 15, 24, 0.94) !important;
+      border: 1.5px solid rgba(71, 85, 105, 0.4) !important;
+      opacity: 0.65;
+      cursor: not-allowed !important;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+
+    .grid-cell.cell-locked:hover {
+      transform: none !important;
+      box-shadow: none !important;
+      border-color: rgba(71, 85, 105, 0.4) !important;
+    }
+
+    .grid-cell.ai-suggested {
+      border: 3px dashed var(--neon-gold) !important;
+      animation: suggestPulse 1.2s infinite alternate;
+    }
+
+    @keyframes suggestPulse {
+      0% { box-shadow: 0 0 6px rgba(255, 184, 0, 0.4); }
+      100% { box-shadow: 0 0 20px rgba(255, 184, 0, 0.9); }
+    }
+
+    .grid-cell.ghost-revealed {
+      border: 3.5px solid var(--neon-green) !important;
+      background: rgba(0, 255, 170, 0.4) !important;
+      animation: ghostBounce 1s infinite alternate;
+    }
+
+    @keyframes ghostBounce {
+      from { transform: scale(1); }
+      to { transform: scale(1.1); filter: drop-shadow(0 0 12px var(--neon-green)); }
+    }
+
+    /* AI Co-Pilot & Recommendation Panel (Right) */
+    .ai-card {
+      background: rgba(0, 243, 255, 0.05);
+      border: 1px solid rgba(0, 243, 255, 0.25);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+    }
+
+    .ai-target-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ai-target-coord {
+      font-size: 20px;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--neon-cyan);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ai-confidence-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(0, 255, 170, 0.15);
+      color: var(--neon-green);
+      border: 1px solid rgba(0, 255, 170, 0.3);
+    }
+
+    .ai-confidence-badge.high {
+      background: rgba(255, 42, 95, 0.25);
+      color: var(--neon-red);
+      border-color: var(--neon-red);
+      animation: pulseAlert 0.8s infinite alternate;
+    }
+
+    /* Direction Indicator Box */
+    .ai-direction-box {
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(0, 243, 255, 0.25);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ai-direction-val {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--neon-gold);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-apply-saran {
+      background: rgba(255, 184, 0, 0.15);
+      border: 1px solid var(--neon-gold);
+      color: var(--neon-gold);
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-apply-saran:hover {
+      background: rgba(255, 184, 0, 0.3);
+      box-shadow: 0 0 14px rgba(255, 184, 0, 0.5);
+    }
+
+    .cf-meta-box {
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 8px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .cf-meta-item {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+    }
+
+    .cf-meta-item b {
+      color: #fff;
+    }
+
+    /* Paranormal Terminal Log */
+    .terminal-container {
+      background: #04080e;
+      border: 1px solid rgba(0, 255, 170, 0.2);
+      border-radius: 8px;
+      padding: 10px;
+      height: 150px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.5;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .terminal-line {
+      display: flex;
+      gap: 8px;
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-4px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .log-time { color: var(--text-muted); }
+    .log-info { color: #8bc34a; }
+    .log-whisper { color: var(--neon-cyan); font-weight: bold; }
+    .log-cold { color: #90a4ae; }
+    .log-warn { color: var(--neon-gold); }
+    .log-danger { color: var(--neon-red); font-weight: bold; }
+    .log-win { color: var(--neon-green); font-weight: bold; }
+
+    /* Dataset Table Container */
+    .dataset-container {
+      width: 100%;
+      margin-top: 10px;
+      z-index: 3;
+      background: rgba(8, 14, 24, 0.85);
+      border: 1px solid rgba(0, 243, 255, 0.3);
+      border-radius: 10px;
+      padding: 10px 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+    }
+
+    .dataset-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--neon-cyan);
+      font-weight: 700;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.15);
+      padding-bottom: 6px;
+    }
+
+    .dataset-table-wrapper {
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .dataset-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .dataset-table th {
+      background: rgba(0, 243, 255, 0.12);
+      color: var(--neon-cyan);
+      text-align: left;
+      padding: 5px 8px;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.25);
+    }
+
+    .dataset-table td {
+      padding: 4px 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #cfd8dc;
+    }
+
+    .badge-tag {
+      background: rgba(0, 255, 170, 0.15);
+      color: var(--neon-green);
+      border: 1px solid rgba(0, 255, 170, 0.3);
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+    }
+
+    /* Status Message Banner */
+    .status-banner {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      transition: all 0.3s;
+    }
+
+    .banner-neutral {
+      background: rgba(0, 243, 255, 0.1);
+      border: 1px solid rgba(0, 243, 255, 0.3);
+      color: var(--neon-cyan);
+    }
+
+    .banner-whisper {
+      background: rgba(0, 243, 255, 0.25);
+      border: 1px solid var(--neon-cyan);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+    }
+
+    .banner-cold {
+      background: rgba(120, 144, 156, 0.2);
+      border: 1px solid #78909c;
+      color: #cfd8dc;
+    }
+
+    .banner-wrong {
+      background: rgba(255, 42, 95, 0.25);
+      border: 1px solid var(--neon-red);
+      color: var(--neon-red);
+      box-shadow: 0 0 20px rgba(255, 42, 95, 0.4);
+    }
+
+    .banner-win {
+      background: rgba(0, 255, 170, 0.3);
+      border: 1px solid var(--neon-green);
+      color: #fff;
+      font-size: 16px;
+      box-shadow: 0 0 30px rgba(0, 255, 170, 0.6);
+      animation: pulseAlert 0.8s infinite alternate;
+    }
+
+    .banner-lose {
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid var(--neon-red);
+      color: var(--neon-red);
+      font-size: 15px;
+      box-shadow: 0 0 30px rgba(255, 42, 95, 0.6);
+    }
+
+    /* Modal Guide */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal-content {
+      background: #0c1524;
+      border: 1px solid var(--neon-cyan);
+      box-shadow: 0 0 40px rgba(0, 243, 255, 0.3);
+      border-radius: 14px;
+      max-width: 650px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+      padding-bottom: 12px;
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      color: var(--neon-cyan);
+      font-family: var(--font-mono);
+    }
+
+    .modal-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 22px;
+      cursor: pointer;
+    }
+
+    .modal-body {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #b0c4de;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .modal-body b {
+      color: #fff;
+    }
+
+    .modal-section {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 3px solid var(--neon-green);
+    }
+  </style>
+</head>
+<body>
+  <!-- Ambient floating particles background -->
+  <canvas id="particles-canvas"></canvas>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-icon">👻</div>
+        <div class="brand-text">
+          <h1>Ghost Radar</h1>
+          <p>AI Uncertainty Engine &bull; Certainty Factor (Dataset &bull; Grid 4x4)</p>
+        </div>
+      </div>
+      <div class="header-controls">
+        <button id="btn-sound" class="sound-toggle" title="Nyalakan/Matikan Audio SFX">
+          <span id="sound-icon">🔊</span>
+          <span id="sound-text">Audio ON</span>
+        </button>
+        <button id="btn-guide" class="btn-guide">
+          <span>ℹ️</span> Panduan Teori
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Dashboard -->
+    <div class="dashboard">
+      <!-- Left Column: HUD & Operations -->
+      <div class="panel">
+        <div class="panel-title">Status Detektor & Kontrol</div>
+
+        <!-- Lives, Battery, EMF -->
+        <div class="hud-box">
+          <div class="stat-row">
+            <span class="stat-label">❤️ Nyawa (Lives):</span>
+            <div id="lives-container" class="lives-container">
+              <span class="heart-icon">❤️</span>
+              <span class="heart-icon">❤️</span>
+              <span class="heart-icon">❤️</span>
+            </div>
+          </div>
+
+          <div class="stat-row">
+            <span class="stat-label">🔋 Baterai Radar:</span>
+            <div class="battery-wrapper">
+              <div class="battery-bar">
+                <div id="battery-fill" class="battery-fill"></div>
+              </div>
+              <span id="battery-val" class="battery-val">8/8</span>
+            </div>
+          </div>
+
+          <!-- Live EMF Meter -->
+          <div class="emf-meter">
+            <div class="emf-header">
+              <span>EMF FIELD STRENGTH</span>
+              <span id="emf-text">LEVEL 1 (NORMAL)</span>
+            </div>
+            <div class="emf-leds">
+              <div class="emf-led active-1" id="emf-1"></div>
+              <div class="emf-led" id="emf-2"></div>
+              <div class="emf-led" id="emf-3"></div>
+              <div class="emf-led" id="emf-4"></div>
+              <div class="emf-led" id="emf-5"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode Aksi (Scan vs Tangkap) -->
+        <div class="action-mode-group">
+          <button id="btn-mode-scan" class="mode-btn active scan">
+            <span>🔍 SCAN SEKTOR</span>
+            <span class="mode-sub">Biaya: 1 Baterai</span>
+          </button>
+          <button id="btn-mode-tangkap" class="mode-btn tangkap">
+            <span>🎯 TANGKAP HANTU</span>
+            <span class="mode-sub">Salah = -1 Nyawa</span>
+          </button>
+        </div>
+
+        <!-- Restart Button -->
+        <button id="btn-new-game" class="btn-restart">
+          <span>🔄</span> Mulai Game Baru (4x4)
+        </button>
+
+        <!-- Live Status Banner -->
+        <div id="status-banner" class="status-banner banner-neutral">
+          Hantu bersembunyi di petak 4x4 (diam). Klik sektor untuk memindai!
+        </div>
+
+        <!-- Legend -->
+        <div class="hud-box" style="font-size: 11px; color: var(--text-muted); line-height: 1.6;">
+          <div><b style="color:var(--neon-cyan)">🟦 Garis Cyan:</b> Sensor berbunyi ("Ada Bisikan")</div>
+          <div><b style="color:#78909c">⬜ Garis Putus-putus:</b> Sensor dingin (Hening)</div>
+          <div><b style="color:var(--neon-gold)">🟧 Garis Oranye:</b> Saran Scan AI (CF)</div>
+          <div><b style="color:#64748b">❌ 0.00 (Terkunci):</b> Sel salah ditangkap (terkunci)</div>
+          <div><b style="color:var(--neon-green)">🟩 👻 Hantu:</b> Posisi akhir saat game selesai (100%)</div>
+        </div>
+      </div>
+
+      <!-- Center Column: Radar Screen & Interactive Board -->
+      <div class="radar-screen-panel">
+        <canvas id="radar-canvas"></canvas>
+
+        <div class="board-header-badge">
+          <span>🔮 Peta Certainty Factor (Dataset Berjalan)</span>
+          <span style="color:var(--neon-green); font-weight:bold;">&bull; Grid 4x4</span>
+        </div>
+
+        <!-- Grid Container with High-Contrast External Row and Column Labels -->
+        <div class="grid-container">
+          <div class="tactical-grid-wrapper">
+            <!-- Corner Label -->
+            <div class="grid-corner-label">
+              <span style="color:var(--neon-green); font-size:9px;">BARIS &darr;</span>
+              <span style="font-weight:900; font-size:11px; color:#fff;">B \ K</span>
+              <span style="color:var(--neon-cyan); font-size:9px;">&rarr; KOLOM</span>
+            </div>
+
+            <!-- Top Column Headers (Outer) -->
+            <div class="grid-col-headers">
+              <div class="col-header-item">KOLOM 0</div>
+              <div class="col-header-item">KOLOM 1</div>
+              <div class="col-header-item">KOLOM 2</div>
+              <div class="col-header-item">KOLOM 3</div>
+            </div>
+
+            <!-- Left Row Headers (Outer) -->
+            <div class="grid-row-headers">
+              <div class="row-header-item">BARIS 0</div>
+              <div class="row-header-item">BARIS 1</div>
+              <div class="row-header-item">BARIS 2</div>
+              <div class="row-header-item">BARIS 3</div>
+            </div>
+
+            <!-- The 4x4 Grid Board -->
+            <div id="grid-board" class="grid-board"></div>
+          </div>
+        </div>
+
+        <!-- Live Dataset Table (Kumpulan Data Pemilihan) -->
+        <div class="dataset-container">
+          <div class="dataset-header">
+            <span>📊 DATASET ITERASI PEMILIHAN GRID & NILAI CF</span>
+            <span id="dataset-count-badge" class="badge-tag">0 Data</span>
+          </div>
+          <div class="dataset-table-wrapper">
+            <table class="dataset-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Grid Dipilih</th>
+                  <th>Hasil Sensor</th>
+                  <th>Sisa Belum Dipilih</th>
+                  <th>Arah Indikasi Hantu</th>
+                  <th>CF Teratas</th>
+                </tr>
+              </thead>
+              <tbody id="dataset-tbody">
+                <tr>
+                  <td colspan="6" style="text-align:center; color:var(--text-muted); padding:10px;">
+                    Belum ada pemilihan grid. Klik salah satu sektor untuk mulai mengumpulkan dataset!
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: AI Co-Pilot & Investigation Log -->
+      <div class="panel">
+        <div class="panel-title">AI Co-Pilot (Certainty Factor)</div>
+
+        <!-- AI Recommendation Card -->
+        <div class="ai-card">
+          <div class="stat-label">🎯 TEBAKAN TERBAIK AI:</div>
+          <div class="ai-target-row">
+            <div id="ai-best-target" class="ai-target-coord">
+              <span>Sektor</span> <span id="ai-coord-text">(B?, K?)</span>
+            </div>
+            <div id="ai-conf-badge" class="ai-confidence-badge">CF: 0.06 (6%)</div>
+          </div>
+
+          <!-- Direction of Likely Ghost Location -->
+          <div class="ai-direction-box">
+            <div class="stat-label">🧭 ARAH KEMUNGKINAN HANTU:</div>
+            <div id="ai-direction-text" class="ai-direction-val">Semua sektor seimbang (0.06)</div>
+          </div>
+
+          <div style="font-size: 11px; color: var(--text-muted);" id="ai-action-hint">
+            Kumpulkan bukti scan awal untuk meningkatkan nilai keyakinan.
+          </div>
+
+          <button id="btn-apply-saran" class="btn-apply-saran">
+            <span>💡</span> Sorot Saran Scan AI: <span id="ai-saran-coord">...</span>
+          </button>
+        </div>
+
+        <!-- CF Analysis Metadata -->
+        <div class="cf-meta-box">
+          <div class="cf-meta-item">
+            <span>Sisa Belum Dipilih:</span>
+            <b id="cf-unpicked-count">16 petak</b>
+          </div>
+          <div class="cf-meta-item">
+            <span>Kandidat Bersaing:</span>
+            <b id="cf-kandidat-count">16 petak</b>
+          </div>
+          <div class="cf-meta-item">
+            <span>Ambang Yakin:</span>
+            <b>CF &ge; 0.85 & selisih &ge; 0.15</b>
+          </div>
+          <div class="cf-meta-item">
+            <span>Status AI:</span>
+            <b id="cf-status-text" style="color:var(--neon-gold)">Belum Yakin</b>
+          </div>
+        </div>
+
+        <!-- Terminal Activity Log -->
+        <div class="panel-title" style="margin-top: 6px;">Terminal Investigasi</div>
+        <div id="terminal-log" class="terminal-container">
+          <div class="terminal-line">
+            <span class="log-time">[SYSTEM]</span>
+            <span class="log-info">Radar 4x4 aktif. Hantu terdeteksi statis (tidak bergerak).</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guide Modal -->
+  <div id="modal-guide" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📖 PANDUAN INVESTIGASI CERTAINTY FACTOR (CF)</h2>
+        <button id="btn-close-modal" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <b>🎯 Aturan Permainan Utama:</b>
+          <p>&bull; <b>Skala Grid:</b> 1 level tunggal berukuran <b>4x4 (16 petak)</b>.<br>
+          &bull; <b>Pergerakan Hantu:</b> <b>Hantu DIAM TOTAL (statis)</b>, ditentukan sekali saat game dimulai.<br>
+          &bull; <b>Label Sumbu:</b> Label <b>KOLOM 0..3</b> di bagian atas dan <b>BARIS 0..3</b> di samping kiri ditampilkan dengan kontras tinggi.</p>
+        </div>
+        <div class="modal-section">
+          <b>📊 Perhitungan CF Berdasarkan Grid Belum Dipilih:</b>
+          <p>&bull; Nilai CF setiap grid dihitung <b>hanya berdasarkan grid yang belum dipilih</b>.<br>
+          &bull; <b>Tidak ada lagi grid bernilai 0</b> di sekitar grid yang sudah dicek dan ternyata salah. Hanya grid yang salah ditangkap yang dikunci ke 0. Grid yang hanya di-scan tetap terbuka dan boleh di-scan ulang.<br>
+          &bull; Grid yang belum dipilih memiliki nilai CF positif sesuai kumpulan dataset bukti yang terkumpul sampai iterasi saat ini.</p>
+        </div>
+        <div class="modal-section">
+          <b>🧠 Dataset & Arah Keberadaan Hantu:</b>
+          <p>&bull; <b>Dataset:</b> Kumpulan data rekaman seluruh pemilihan grid beserta respons sensor.<br>
+          &bull; <b>Arah Hantu:</b> Pola sebaran nilai CF menunjukkan arah kemungkinan keberadaan hantu (seperti Barat Laut, Timur Laut, Tenggara, Barat Daya).<br>
+          &bull; Rumus kombinasi bukti: <code>CF = CF1 + CF2 * (1 - CF1)</code>.</p>
+        </div>
+        <div class="modal-section">
+          <b>🔄 Game Baru:</b>
+          <p>&bull; Setiap kali game baru dimulai, hantu ditempatkan di <b>sel yang berbeda</b> dari posisi game sebelumnya.<br>
+          &bull; Seluruh dataset direset, semua sel dikembalikan ke kondisi belum dipilih (base CF = 1/16 = 0.06).</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Engine & Script -->
+  <script>
+    /* =========================================================
+       1. WEB AUDIO API PROCEDURAL SOUND SYNTHESIZER
+       ========================================================= */
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+      }
+
+      playSonarPing() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1200, now);
+        osc.frequency.exponentialRampToValueAtTime(500, now + 0.35);
+
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }
+
+      playWhisper() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        const bufferSize = this.ctx.sampleRate * 0.5;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(800, now);
+        filter.frequency.exponentialRampToValueAtTime(1600, now + 0.4);
+        filter.Q.value = 5.0;
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        const osc = this.ctx.createOscillator();
+        const oscGain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.linearRampToValueAtTime(450, now + 0.45);
+        oscGain.gain.setValueAtTime(0.08, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        osc.connect(oscGain);
+        oscGain.connect(this.ctx.destination);
+
+        noise.start(now);
+        noise.stop(now + 0.5);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      }
+
+      playColdHum() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.35);
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.4);
+      }
+
+      playEMFClick(level) {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const clicks = Math.min(level * 2, 8);
+        for (let i = 0; i < clicks; i++) {
+          setTimeout(() => {
+            if (!this.ctx) return;
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(800 + Math.random() * 400, now);
+            gain.gain.setValueAtTime(0.08, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.04);
+          }, i * 40);
+        }
+      }
+
+      playHeartbeat() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(95, now);
+        osc.frequency.exponentialRampToValueAtTime(45, now + 0.18);
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+      }
+
+      playVictory() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const notes = [440, 554, 659, 880, 1108];
+        notes.forEach((freq, idx) => {
+          setTimeout(() => {
+            if (!this.ctx) return;
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, now);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.5);
+          }, idx * 110);
+        });
+      }
+
+      playFailLaugh() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const notes = [600, 520, 440, 360, 280];
+        notes.forEach((freq, idx) => {
+          setTimeout(() => {
+            if (!this.ctx) return;
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(freq, now);
+            osc.frequency.linearRampToValueAtTime(freq - 50, now + 0.15);
+            gain.gain.setValueAtTime(0.14, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.16);
+          }, idx * 90);
+        });
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    /* =========================================================
+       2. CERTAINTY FACTOR ENGINE DENGAN DATASET BERJALAN
+       ========================================================= */
+    const UKURAN = 4;
+    const BATERAI_AWAL = 8;
+    const NYAWA_AWAL = 3;
+    const RADIUS = 1;
+    const P_DEKAT = 0.80;
+    const P_JAUH = 0.15;
+    const AMBANG_CF = 0.85;
+    const SELISIH_CF = 0.15;
+
+    // Nilai bukti Certainty Factor (sama dengan notebook, skala 0 s/d 1)
+    const CF_BISIK_DEKAT = 0.60;   // sensor berbunyi -> petak dekat
+    const CF_BISIK_JAUH = 0.08;    // sensor berbunyi -> petak jauh
+    const CF_DINGIN_JAUH = 0.35;   // sensor dingin   -> petak jauh
+    const CF_DINGIN_DEKAT = 0.04;  // sensor dingin   -> petak dekat
+
+    // Memori posisi hantu pada game sebelumnya agar selalu beda
+    let posisiHantuSebelumnya = null;
+
+    function jarak(a, b) {
+      return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]));
+    }
+
+    /* Rumus Kombinasi Certainty Factor: CF = CF1 + CF2 * (1 - CF1) (skala 0 s/d 1) */
+    function gabungCF(a, b) {
+      a = Math.max(0.0, Math.min(1.0, a));
+      b = Math.max(0.0, Math.min(1.0, b));
+      return Math.min(1.0, Math.max(0.0, a + b * (1.0 - a)));
+    }
+
+    function tebakanTerbaikCF(cf, terkunci) {
+      const n = cf.length;
+      let maxVal = -1.0;
+      let maxCoord = [0, 0];
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (!terkunci[r][c] && cf[r][c] > maxVal) {
+            maxVal = cf[r][c];
+            maxCoord = [r, c];
+          }
+        }
+      }
+      if (maxVal < 0) maxVal = 0.0;
+      return { coord: maxCoord, value: maxVal };
+    }
+
+    function kandidatCF(cf, terkunci) {
+      const n = cf.length;
+      let maxVal = 0.0;
+      let unlockedCount = 0;
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (!terkunci[r][c]) {
+            unlockedCount++;
+            if (cf[r][c] > maxVal) maxVal = cf[r][c];
+          }
+        }
+      }
+
+      const mask = Array.from({ length: n }, () => new Array(n).fill(false));
+      let count = 0;
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (!terkunci[r][c] && cf[r][c] >= maxVal - SELISIH_CF) {
+            mask[r][c] = true;
+            count++;
+          }
+        }
+      }
+      return { mask, count, maxVal, unlockedCount };
+    }
+
+    function aiYakin(cf, terkunci) {
+      const best = tebakanTerbaikCF(cf, terkunci);
+      const kand = kandidatCF(cf, terkunci);
+      return best.value >= AMBANG_CF && kand.count === 1;
+    }
+
+    function saranScanCF(cf, terkunci) {
+      const n = cf.length;
+      const kand = kandidatCF(cf, terkunci);
+      if (kand.count === 1) {
+        for (let r = 0; r < n; r++) {
+          for (let c = 0; c < n; c++) {
+            if (kand.mask[r][c]) return [r, c];
+          }
+        }
+      }
+
+      let terbaik = null;
+      let skorTerbaik = -1;
+
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          if (terkunci[r][c]) continue; // Jangan sarankan sel yang sudah terkunci
+
+          let cov = 0;
+          for (let dr = -RADIUS; dr <= RADIUS; dr++) {
+            for (let dc = -RADIUS; dc <= RADIUS; dc++) {
+              const rr = r + dr, cc = c + dc;
+              if (rr >= 0 && rr < n && cc >= 0 && cc < n) {
+                if (kand.mask[rr][cc]) cov++;
+              }
+            }
+          }
+          const skor = Math.min(cov, kand.count - cov);
+          if (skor > skorTerbaik) {
+            skorTerbaik = skor;
+            terbaik = [r, c];
+          }
+        }
+      }
+
+      if (!terbaik) {
+        for (let r = 0; r < n; r++) {
+          for (let c = 0; c < n; c++) {
+            if (!terkunci[r][c]) return [r, c];
+          }
+        }
+        return [0, 0];
+      }
+      return terbaik;
+    }
+
+    /* Helper untuk menentukan arah kemungkinan keberadaan hantu */
+    function hitungArahHantu(bestCoord, cfVal, jumlahData) {
+      if (jumlahData === 0) {
+        return "Semua sektor seimbang (belum ada pemilihan)";
+      }
+      const [r, c] = bestCoord;
+      let sektor = "";
+      if (r <= 1 && c <= 1) sektor = "Barat Laut (B0-B1, K0-K1)";
+      else if (r <= 1 && c >= 2) sektor = "Timur Laut (B0-B1, K2-K3)";
+      else if (r >= 2 && c <= 1) sektor = "Barat Daya (B2-B3, K0-K1)";
+      else sektor = "Tenggara (B2-B3, K2-K3)";
+
+      return `Sektor ${sektor} &bull; Target B${r}K${c} [CF: ${(cfVal * 100).toFixed(0)}%]`;
+    }
+
+    /* Game State Class */
+    class GhostRadarGame {
+      constructor() {
+        this.n = UKURAN;
+        this.baterai = BATERAI_AWAL;
+        this.nyawa = NYAWA_AWAL;
+        this.ditemukan = false;
+        this.status = "main"; // "main" | "menang" | "kalah"
+
+        // Posisi hantu acak sekali di awal, dan WAJIB berbeda dari game sebelumnya
+        let r, c;
+        do {
+          r = Math.floor(Math.random() * this.n);
+          c = Math.floor(Math.random() * this.n);
+        } while (
+          posisiHantuSebelumnya !== null &&
+          r === posisiHantuSebelumnya[0] &&
+          c === posisiHantuSebelumnya[1]
+        );
+        this.hantu = [r, c];
+        posisiHantuSebelumnya = [r, c];
+
+        // Status kunci: apakah sel sudah pernah dipilih/dicek
+        this.terkunci = Array.from({ length: this.n }, () => new Array(this.n).fill(false));
+        this.salahTangkap = [];
+        this.dataset = []; // Kumpulan data pemilihan grid sampai iterasi ini
+        this.cf = Array.from({ length: this.n }, () => new Float64Array(this.n));
+
+        // Hitung CF awal berdasarkan seluruh grid yang belum dipilih (16 grid)
+        this.rehitungCFDariDataset();
+      }
+
+      getUnpickedList() {
+        const list = [];
+        for (let r = 0; r < this.n; r++) {
+          for (let c = 0; c < this.n; c++) {
+            if (!this.terkunci[r][c]) {
+              list.push([r, c]);
+            }
+          }
+        }
+        return list;
+      }
+
+      /* Pembaruan CF: Dihitung HANYA berdasarkan grid yang belum dipilih */
+      rehitungCFDariDataset() {
+        const unpicked = this.getUnpickedList();
+        const K = unpicked.length;
+
+        // Sel yang sudah dipilih dan terbukti salah langsung dikunci ke 0
+        for (let r = 0; r < this.n; r++) {
+          for (let c = 0; c < this.n; c++) {
+            if (this.terkunci[r][c]) {
+              this.cf[r][c] = 0.0;
+            }
+          }
+        }
+
+        if (K === 0) return;
+
+        // Base CF untuk tiap sel yang belum dipilih (1 / K)
+        const baseCF = 1.0 / K;
+        unpicked.forEach(([r, c]) => {
+          this.cf[r][c] = baseCF;
+        });
+
+        // Perbarui dengan seluruh data yang terkumpul di dataset sampai iterasi ini
+        this.dataset.forEach(entry => {
+          const [sr, sc] = entry.selDipilih;
+          const sinyal = entry.sinyal;
+
+          unpicked.forEach(([r, c]) => {
+            const d = jarak([r, c], [sr, sc]);
+            let e = 0;
+            if (sinyal) {
+              // Ada bisikan: sel dekat (<= 1) mendapat bukti kuat, sel jauh mendapat bukti kecil
+               e = (d <= RADIUS) ? CF_BISIK_DEKAT : CF_BISIK_JAUH;
+            } else {
+              // Dingin: sel jauh (> 1) mendapat bukti lebih kuat, sel dekat mendapat bukti kecil
+              e = (d > RADIUS) ? CF_DINGIN_JAUH : CF_DINGIN_DEKAT;
+            }
+            // Gabungkan menggunakan aturan kombinasi CF: CF = CF1 + CF2 * (1 - CF1)
+            this.cf[r][c] = gabungCF(this.cf[r][c], e);
+          });
+        });
+      }
+
+      scan(r, c) {
+        if (this.status !== "main") return { status: "ended", msg: "Game sudah selesai." };
+        if (this.terkunci[r][c]) return { status: "locked", msg: "Sektor ini sudah dipilih/terkunci." };
+        if (this.baterai <= 0) return { status: "no_battery", msg: "Baterai habis! Hanya bisa menangkap." };
+
+        this.baterai--;
+        const isGhostHere = (r === this.hantu[0] && c === this.hantu[1]);
+        const d = jarak(this.hantu, [r, c]);
+        const p = d <= RADIUS ? P_DEKAT : P_JAUH;
+        const sinyal = Math.random() < p; // Sensor bisa alarm palsu
+
+        // Scan hanya memberi petunjuk: petak TIDAK dikunci (hanya salah tangkap yang mengunci).
+        // Ini mencegah kebocoran posisi hantu dan memungkinkan scan ulang pada petak yang sama.
+
+        // Simpan data pemilihan ke dataset
+        const iterasiKe = this.dataset.length + 1;
+        this.dataset.push({
+          iterasi: iterasiKe,
+          selDipilih: [r, c],
+          mode: "scan",
+          sisa: this.getUnpickedList().length,
+          sinyal: sinyal,
+          keterangan: sinyal ? "Ada Bisikan 👂" : "Dingin ❄️",
+          jarakHantu: d
+        });
+
+        // Perbarui CF seluruh grid yang belum dipilih
+        this.rehitungCFDariDataset();
+
+        return {
+          status: "ok",
+          sinyal,
+          jarakHantu: d,
+          isGhostHere,
+          msg: sinyal ? "ADA BISIKAN 👂 (Sinyal Mendukung Terdeteksi!)" : "Dingin... Tidak ada bisikan (❄️)"
+        };
+      }
+
+      tangkap(r, c) {
+        if (this.status !== "main") return { status: "ended", msg: "Game sudah selesai." };
+        if (this.terkunci[r][c]) return { status: "locked", msg: "Sektor ini sudah dipilih/terkunci." };
+
+        if (r === this.hantu[0] && c === this.hantu[1]) {
+          this.status = "menang";
+          this.ditemukan = true;
+          this.cf[r][c] = 1.0;
+          return { status: "menang", msg: "🎉 BERHASIL! Hantu tertangkap basah di sektor ini!" };
+        }
+
+        // Salah tangkap: nyawa berkurang, petak dikunci (0), catat ke dataset
+        this.nyawa--;
+        this.salahTangkap.push([r, c]);
+        this.terkunci[r][c] = true;
+        this.cf[r][c] = 0.0;
+
+        const iterasiKe = this.dataset.length + 1;
+        this.dataset.push({
+          iterasi: iterasiKe,
+          selDipilih: [r, c],
+          mode: "tangkap",
+          sisa: this.getUnpickedList().length,
+          sinyal: false,
+          keterangan: "Salah Tangkap ❌",
+          jarakHantu: jarak(this.hantu, [r, c])
+        });
+
+        this.rehitungCFDariDataset();
+
+        if (this.nyawa <= 0) {
+          this.status = "kalah";
+          return { status: "kalah", msg: "💀 Nyawa habis! Hantu melarikan diri ke kegelapan." };
+        }
+
+        return {
+          status: "salah",
+          nyawaSisa: this.nyawa,
+          msg: `❌ SALAH TANGKAP! Sektor kosong. Nyawa tersisa ${this.nyawa}. Sektor B${r}K${c} dikunci.`
+        };
+      }
+    }
+
+    /* =========================================================
+       3. UI CONTROLLER & VISUALIZER
+       ========================================================= */
+    let game = new GhostRadarGame();
+    let currentMode = "scan"; // "scan" | "tangkap"
+
+    const boardEl = document.getElementById("grid-board");
+    const livesEl = document.getElementById("lives-container");
+    const batteryFillEl = document.getElementById("battery-fill");
+    const batteryValEl = document.getElementById("battery-val");
+    const statusBannerEl = document.getElementById("status-banner");
+    const terminalLogEl = document.getElementById("terminal-log");
+    const aiTargetTextEl = document.getElementById("ai-coord-text");
+    const aiConfBadgeEl = document.getElementById("ai-conf-badge");
+    const aiDirectionTextEl = document.getElementById("ai-direction-text");
+    const aiActionHintEl = document.getElementById("ai-action-hint");
+    const aiSaranCoordEl = document.getElementById("ai-saran-coord");
+    const cfKandidatCountEl = document.getElementById("cf-kandidat-count");
+    const cfUnpickedCountEl = document.getElementById("cf-unpicked-count");
+    const cfStatusTextEl = document.getElementById("cf-status-text");
+    const datasetTbodyEl = document.getElementById("dataset-tbody");
+    const datasetBadgeEl = document.getElementById("dataset-count-badge");
+
+    // Dynamic color gradient for CF values from 0.0 to 1.0
+    function getCfColor(v) {
+      v = Math.max(0.0, Math.min(1.0, v));
+      if (v <= 0.0) {
+        return "rgba(10, 18, 28, 0.85)";
+      }
+      if (v < 0.4) {
+        // 0.0 to 0.4: dark tech navy to cyan-blue
+        const t = v / 0.4;
+        const r = Math.round(11 + t * (0 - 11));
+        const g = Math.round(21 + t * (162 - 21));
+        const b = Math.round(36 + t * (199 - 36));
+        return `rgba(${r}, ${g}, ${b}, 0.85)`;
+      } else if (v < 0.7) {
+        // 0.4 to 0.7: cyan-blue to purple
+        const t = (v - 0.4) / 0.3;
+        const r = Math.round(0 + t * (189 - 0));
+        const g = Math.round(162 + t * (0 - 162));
+        const b = Math.round(199 + t * (255 - 199));
+        return `rgba(${r}, ${g}, ${b}, 0.88)`;
+      } else {
+        // 0.7 to 1.0: purple to bright neon crimson
+        const t = (v - 0.7) / 0.3;
+        const r = Math.round(189 + t * (255 - 189));
+        const g = Math.round(0 + t * (42 - 0));
+        const b = Math.round(255 + t * (95 - 255));
+        return `rgba(${r}, ${g}, ${b}, 0.94)`;
+      }
+    }
+
+    function addLog(msg, type = "info") {
+      const line = document.createElement("div");
+      line.className = "terminal-line";
+      const now = new Date();
+      const timeStr = `[${now.toTimeString().split(" ")[0]}]`;
+      line.innerHTML = `<span class="log-time">${timeStr}</span> <span class="log-${type}">${msg}</span>`;
+      terminalLogEl.appendChild(line);
+      terminalLogEl.scrollTop = terminalLogEl.scrollHeight;
+    }
+
+    function updateEMF(level) {
+      const labels = [
+        "LEVEL 0 (CLEAR)",
+        "LEVEL 1 (NORMAL)",
+        "LEVEL 2 (WEAK ANOMALY)",
+        "LEVEL 3 (MODERATE)",
+        "LEVEL 4 (HIGH DISTURBANCE)",
+        "LEVEL 5 (CRITICAL PROXIMITY)"
+      ];
+      document.getElementById("emf-text").innerText = labels[level] || labels[1];
+      for (let i = 1; i <= 5; i++) {
+        const led = document.getElementById(`emf-${i}`);
+        led.className = "emf-led";
+        if (i <= level) {
+          led.classList.add(`active-${i}`);
+        }
+      }
+    }
+
+    function renderBoard() {
+      boardEl.innerHTML = "";
+      const n = game.n;
+      const scanMap = new Map();
+      game.dataset.forEach(entry => scanMap.set(`${entry.selDipilih[0]},${entry.selDipilih[1]}`, entry.sinyal));
+
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          const cell = document.createElement("div");
+          cell.className = "grid-cell";
+          cell.dataset.r = r;
+          cell.dataset.c = c;
+
+          const isLocked = game.terkunci[r][c];
+          const v = game.cf[r][c];
+
+          if (isLocked) {
+            cell.classList.add("cell-locked");
+          } else {
+            cell.style.background = getCfColor(v);
+          }
+
+          const key = `${r},${c}`;
+          if (scanMap.has(key)) {
+            cell.classList.add(scanMap.get(key) ? "scanned-whisper" : "scanned-cold");
+          }
+
+          const isWrong = game.salahTangkap.some(([sr, sc]) => sr === r && sc === c);
+          if (isWrong) {
+            cell.classList.add("wrong-caught");
+          }
+
+          let contentHtml = "";
+          if (game.status !== "main" && r === game.hantu[0] && c === game.hantu[1]) {
+            cell.classList.remove("cell-locked");
+            cell.classList.add("ghost-revealed");
+            contentHtml = `
+              <span class="cell-coord">B${r} K${c}</span>
+              <span class="cell-value" style="font-size: 20px;">👻</span>
+              <span class="cell-pct" style="color: var(--neon-green); font-weight: bold;">HANTU 100%</span>
+            `;
+          } else if (isLocked) {
+            contentHtml = `
+              <span class="cell-coord">B${r} K${c}</span>
+              <span class="cell-value" style="color: #64748b; font-size: 13px;">❌ 0.00</span>
+              <span class="cell-pct" style="color: #475569;">(0%) TERPILIH</span>
+            `;
+          } else {
+            contentHtml = `
+              <span class="cell-coord">B${r} K${c}</span>
+              <span class="cell-value" style="color: ${v >= 0.5 ? '#fff' : '#e2f1ff'};">${v.toFixed(2)}</span>
+              <span class="cell-pct" style="color: ${v >= 0.5 ? 'var(--neon-green)' : 'var(--text-muted)'};">(${Math.round(v * 100)}%)</span>
+            `;
+          }
+
+          cell.innerHTML = contentHtml;
+          cell.addEventListener("click", () => handleCellClick(r, c));
+          boardEl.appendChild(cell);
+        }
+      }
+
+      // Update HUD Lives
+      livesEl.innerHTML = "";
+      for (let i = 0; i < NYAWA_AWAL; i++) {
+        const heart = document.createElement("span");
+        heart.className = "heart-icon" + (i >= game.nyawa ? " lost" : "");
+        heart.innerText = "❤️";
+        livesEl.appendChild(heart);
+      }
+
+      // Battery
+      const battPct = Math.round((game.baterai / BATERAI_AWAL) * 100);
+      batteryFillEl.style.width = `${battPct}%`;
+      batteryValEl.innerText = `${game.baterai}/${BATERAI_AWAL}`;
+      if (game.baterai <= 2) {
+        batteryFillEl.classList.add("low");
+      } else {
+        batteryFillEl.classList.remove("low");
+      }
+
+      // AI Stats
+      const best = tebakanTerbaikCF(game.cf, game.terkunci);
+      const kand = kandidatCF(game.cf, game.terkunci);
+      const saran = saranScanCF(game.cf, game.terkunci);
+      const yakin = aiYakin(game.cf, game.terkunci);
+
+      aiTargetTextEl.innerText = `B${best.coord[0]} K${best.coord[1]}`;
+      aiConfBadgeEl.innerText = `CF: ${best.value.toFixed(2)} (${Math.round(best.value * 100)}%)`;
+      cfUnpickedCountEl.innerText = `${kand.unlockedCount} petak`;
+      cfKandidatCountEl.innerText = `${kand.count} petak bersaing`;
+
+      // Direction Indicator
+      const arahText = hitungArahHantu(best.coord, best.value, game.dataset.length);
+      aiDirectionTextEl.innerHTML = arahText;
+
+      if (yakin) {
+        aiConfBadgeEl.className = "ai-confidence-badge high";
+        cfStatusTextEl.style.color = "var(--neon-green)";
+        cfStatusTextEl.innerText = "✅ AI CUKUP YAKIN!";
+        aiActionHintEl.innerHTML = `<b style="color:var(--neon-red)">AI YAKIN!</b> Sektor B${best.coord[0]} K${best.coord[1]} sangat kuat didukung bukti (CF ${best.value.toFixed(2)}). Coba mode TANGKAP!`;
+      } else {
+        aiConfBadgeEl.className = "ai-confidence-badge";
+        cfStatusTextEl.style.color = "var(--neon-gold)";
+        cfStatusTextEl.innerText = `Belum Yakin (${kand.count} kandidat bersaing)`;
+        aiActionHintEl.innerText = `Kumpulkan lebih banyak bukti atau ikuti saran scan AI.`;
+      }
+
+      aiSaranCoordEl.innerText = `B${saran[0]} K${saran[1]}`;
+
+      // Render Dataset Table
+      renderDatasetTable();
+    }
+
+    function renderDatasetTable() {
+      datasetBadgeEl.innerText = `${game.dataset.length} Data`;
+      if (game.dataset.length === 0) {
+        datasetTbodyEl.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align:center; color:var(--text-muted); padding:10px;">
+              Belum ada pemilihan grid. Klik salah satu sektor untuk mulai mengumpulkan dataset!
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      datasetTbodyEl.innerHTML = "";
+      game.dataset.forEach(entry => {
+        const tr = document.createElement("tr");
+        const [r, c] = entry.selDipilih;
+        const sinyalIcon = entry.mode === "tangkap" ? "❌ Salah Tangkap" : (entry.sinyal ? "👂 Ada Bisikan" : "❄️ Dingin");
+        const sisa = entry.sisa;
+        
+        let arahSimpel = "";
+        if (r <= 1 && c <= 1) arahSimpel = "Barat Laut";
+        else if (r <= 1 && c >= 2) arahSimpel = "Timur Laut";
+        else if (r >= 2 && c <= 1) arahSimpel = "Barat Daya";
+        else arahSimpel = "Tenggara";
+
+        tr.innerHTML = `
+          <td style="font-weight:bold; color:var(--neon-cyan);">#${entry.iterasi}</td>
+          <td><b>B${r} K${c}</b></td>
+          <td><span style="color:${entry.sinyal ? 'var(--neon-cyan)' : '#90a4ae'}">${sinyalIcon}</span></td>
+          <td>${sisa} sel</td>
+          <td style="color:var(--neon-gold);">${arahSimpel}</td>
+          <td style="font-weight:bold; color:#00ffaa;">${entry.sinyal ? '+' + CF_BISIK_DEKAT.toFixed(2) : '+' + CF_DINGIN_JAUH.toFixed(2)}
+        `;
+        datasetTbodyEl.appendChild(tr);
+      });
+    }
+
+    function handleCellClick(r, c) {
+      if (game.status !== "main") {
+        addLog("Game telah selesai. Klik 'Mulai Game Baru'.", "warn");
+        return;
+      }
+
+      // Jika pemain mengklik sel yang sudah terkunci, tidak terjadi apa-apa
+      if (game.terkunci[r][c]) {
+        return;
+      }
+
+      if (currentMode === "scan") {
+        sound.playSonarPing();
+        const res = game.scan(r, c);
+        if (res.status === "no_battery") {
+          addLog("🔋 " + res.msg, "warn");
+          statusBannerEl.className = "status-banner banner-wrong";
+          statusBannerEl.innerText = res.msg;
+          return;
+        }
+
+        if (res.sinyal) {
+          sound.playWhisper();
+          sound.playEMFClick(4);
+          updateEMF(4);
+          statusBannerEl.className = "status-banner banner-whisper";
+          statusBannerEl.innerText = `👂 ADA BISIKAN di (B${r}, K${c})! Dataset diperbarui: CF grid belum dipilih di area sekitar meningkat.`;
+          addLog(`📡 Iterasi #${game.dataset.length}: Scan (B${r}, K${c}) -> ADA BISIKAN! EMF Level 4.`, "whisper");
+        } else {
+          sound.playColdHum();
+          updateEMF(1);
+          statusBannerEl.className = "status-banner banner-cold";
+          statusBannerEl.innerText = `❄️ Hening di (B${r}, K${c}). Dataset diperbarui: CF grid belum dipilih di area luar meningkat.`;
+          addLog(`📡 Iterasi #${game.dataset.length}: Scan (B${r}, K${c}) -> Dingin. Area hening.`, "cold");
+        }
+      } else {
+        // Mode Tangkap
+        const res = game.tangkap(r, c);
+        if (res.status === "menang") {
+          sound.playVictory();
+          updateEMF(5);
+          statusBannerEl.className = "status-banner banner-win";
+          statusBannerEl.innerText = `🎉 BERHASIL MENANG! Hantu tertangkap di (B${r}, K${c})!`;
+          addLog(`🎯 TANGKAP (B${r}, K${c}) -> BERHASIL! Hantu tertangkap!`, "win");
+        } else if (res.status === "kalah") {
+          sound.playFailLaugh();
+          updateEMF(0);
+          statusBannerEl.className = "status-banner banner-lose";
+          statusBannerEl.innerText = `💀 KALAH! Nyawa habis. Hantu asli berada di (B${game.hantu[0]}, K${game.hantu[1]}).`;
+          addLog(`💀 TANGKAP (B${r}, K${c}) -> Nyawa habis! Game Over. Posisi hantu: (B${game.hantu[0]}, K${game.hantu[1]}).`, "danger");
+        } else {
+          sound.playHeartbeat();
+          sound.playFailLaugh();
+          updateEMF(1);
+          statusBannerEl.className = "status-banner banner-wrong";
+          statusBannerEl.innerText = res.msg;
+          addLog(`❌ TANGKAP (B${r}, K${c}) -> Salah tangkap! Grid dikunci (0.00). Nyawa tersisa ${res.nyawaSisa}.`, "danger");
+        }
+      }
+
+      renderBoard();
+    }
+
+    /* Event Listeners */
+    document.getElementById("btn-mode-scan").addEventListener("click", () => {
+      currentMode = "scan";
+      document.getElementById("btn-mode-scan").classList.add("active");
+      document.getElementById("btn-mode-tangkap").classList.remove("active");
+      document.body.style.cursor = "default";
+    });
+
+    document.getElementById("btn-mode-tangkap").addEventListener("click", () => {
+      currentMode = "tangkap";
+      document.getElementById("btn-mode-tangkap").classList.add("active");
+      document.getElementById("btn-mode-scan").classList.remove("active");
+      document.body.style.cursor = "crosshair";
+    });
+
+    document.getElementById("btn-apply-saran").addEventListener("click", () => {
+      const saran = saranScanCF(game.cf, game.terkunci);
+      const cell = document.querySelector(`.grid-cell[data-r="${saran[0]}"][data-c="${saran[1]}"]`);
+      if (cell) {
+        cell.classList.add("ai-suggested");
+        setTimeout(() => cell.classList.remove("ai-suggested"), 2500);
+      }
+      addLog(`💡 AI merekomendasikan scan sektor (B${saran[0]}, K${saran[1]}) untuk memilah kandidat teratas.`, "info");
+    });
+
+    document.getElementById("btn-new-game").addEventListener("click", () => {
+      game = new GhostRadarGame();
+      currentMode = "scan";
+      document.getElementById("btn-mode-scan").classList.add("active");
+      document.getElementById("btn-mode-tangkap").classList.remove("active");
+      statusBannerEl.className = "status-banner banner-neutral";
+      statusBannerEl.innerText = "Game 4x4 baru dimulai! Posisi hantu baru. Semua sel direset ke base CF 0.06.";
+      addLog("🔄 Game Baru dimulai [Grid 4x4]. Posisi hantu berbeda dari game sebelumnya. Dataset direset.", "info");
+      updateEMF(1);
+      renderBoard();
+    });
+
+    // Sound Toggle
+    const soundBtn = document.getElementById("btn-sound");
+    soundBtn.addEventListener("click", () => {
+      const isMuted = sound.toggleMute();
+      document.getElementById("sound-icon").innerText = isMuted ? "🔇" : "🔊";
+      document.getElementById("sound-text").innerText = isMuted ? "Audio OFF" : "Audio ON";
+      soundBtn.classList.toggle("muted", isMuted);
+    });
+
+    // Modal Guide
+    const modalGuide = document.getElementById("modal-guide");
+    document.getElementById("btn-guide").addEventListener("click", () => modalGuide.classList.add("open"));
+    document.getElementById("btn-close-modal").addEventListener("click", () => modalGuide.classList.remove("open"));
+    modalGuide.addEventListener("click", (e) => {
+      if (e.target === modalGuide) modalGuide.classList.remove("open");
+    });
+
+    /* =========================================================
+       4. ANIMATED CANVAS RADAR SWEEP BEAM
+       ========================================================= */
+    const canvas = document.getElementById("radar-canvas");
+    const ctx = canvas.getContext("2d");
+    let angle = 0;
+
+    function resizeRadar() {
+      const rect = document.querySelector(".radar-screen-panel").getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height) * 1.05;
+      canvas.width = size;
+      canvas.height = size;
+    }
+
+    window.addEventListener("resize", resizeRadar);
+    resizeRadar();
+
+    function drawRadar() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const r = canvas.width * 0.44;
+
+      // Concentric circles
+      ctx.strokeStyle = "rgba(0, 243, 255, 0.12)";
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, (r / 4) * i, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Crosshairs
+      ctx.beginPath();
+      ctx.moveTo(cx - r, cy);
+      ctx.lineTo(cx + r, cy);
+      ctx.moveTo(cx, cy - r);
+      ctx.lineTo(cx, cy + r);
+      ctx.stroke();
+
+      // Rotating Sweep Beam with gradient trail
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+
+      const grad = ctx.createLinearGradient(0, 0, r, 0);
+      grad.addColorStop(0, "rgba(0, 243, 255, 0)");
+      grad.addColorStop(1, "rgba(0, 255, 170, 0.65)");
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r, -0.25, 0);
+      ctx.lineTo(0, 0);
+      ctx.fillStyle = "rgba(0, 243, 255, 0.08)";
+      ctx.fill();
+
+      // Leading beam line
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(r, 0);
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = "#00ffaa";
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+
+      ctx.restore();
+
+      angle += 0.025;
+      requestAnimationFrame(drawRadar);
+    }
+    requestAnimationFrame(drawRadar);
+
+    /* =========================================================
+       5. AMBIENT PARTICLES CANVAS
+       ========================================================= */
+    const pCanvas = document.getElementById("particles-canvas");
+    const pCtx = pCanvas.getContext("2d");
+    let particles = [];
+
+    function resizeParticles() {
+      pCanvas.width = window.innerWidth;
+      pCanvas.height = window.innerHeight;
+      particles = Array.from({ length: 35 }, () => ({
+        x: Math.random() * pCanvas.width,
+        y: Math.random() * pCanvas.height,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: -Math.random() * 0.5 - 0.2,
+        size: Math.random() * 2.5 + 1,
+        alpha: Math.random() * 0.4 + 0.1
+      }));
+    }
+    window.addEventListener("resize", resizeParticles);
+    resizeParticles();
+
+    function drawParticles() {
+      pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.y < 0) {
+          p.y = pCanvas.height;
+          p.x = Math.random() * pCanvas.width;
+        }
+        pCtx.beginPath();
+        pCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        pCtx.fillStyle = `rgba(0, 243, 255, ${p.alpha})`;
+        pCtx.shadowColor = "#00f3ff";
+        pCtx.shadowBlur = 6;
+        pCtx.fill();
+      });
+      requestAnimationFrame(drawParticles);
+    }
+    requestAnimationFrame(drawParticles);
+
+    // Initial Start
+    renderBoard();
+  </script>
+</body>
+</html>
